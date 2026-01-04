@@ -1,2 +1,2 @@
-# Forecasting-U.S.-Immigration-Rates-with-Regression-and-Machine-Learning
+# Forecasting U.S. Immigration Rates with Regression and Machine Learning
 In this small project I will forecast annual U.S immigration counts using historical immigration data and economic indicators. A LOCF (last observation carried forward) and a linear time trend baseline are compared against a lag-based regression and a Random Forest model. Results show that lagged immigration counts are the dominant predictor.
