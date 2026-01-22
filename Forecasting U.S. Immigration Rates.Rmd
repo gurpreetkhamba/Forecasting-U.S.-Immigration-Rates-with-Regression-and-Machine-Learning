@@ -83,9 +83,7 @@ with sync_playwright() as p:
 
 ## Data Cleaning using R
 ```{Dont Run r Making Immigration Dataset}
-files <- list.files("C:/Users/death/OneDrive/Documents/
-                    Forecasting Immigration Project/OHSS_Immigration_Data", 
-                    pattern = "\\.xls", full.names = TRUE)
+files <- list.files("C:/Users/death/OneDrive/Documents/Forecasting Immigration Project/OHSS_Immigration_Data", pattern = "\\.xls", full.names = TRUE)
 
 length(files) 
   
@@ -137,46 +135,12 @@ all_data <- map_dfr(files, tidy_file)
 View(all_data)
 #write.csv(all_data, "OHSS Immigration Data.csv", row.names = FALSE)
 
-all_data <- all_data|>
-  mutate(
-    Characteristic = case_when(
-      Characteristic == "Unknown" &
-      Category == "Marital status" ~ "Unknown Marital Status",
-      
-      Characteristic == "Unknown" &
-      Category == "Occupation" ~ "Unknown Occupation",
-      
-      Characteristic == "Unknown" &
-      Category == "Age"~ "Unknown Age",
-      
-      Characteristic == "Unknown" ~ "Shouldn't Happen",
-      
-      Characteristic == "Other" &
-      Category == "Leading states/territories of residence" ~ "Other States or Territories",
-      
-      Characteristic == "Other" &
-      Category == "Marital status" ~ "Other Marital status",
-      
-      Characteristic == "Other" &
-      Category == "Broad class of admission"~ "Other Admission",
-      
-      Characteristic == "Other" ~ "Shouldn't Happen Other",
-      
-      TRUE ~ Characteristic
-      )
-    )|>
-  select(-Category)|>
-  pivot_wider(names_from = Characteristic, values_from = Value)
-
-#write.csv(all_data, "OHSS Immigration Data TIDY.csv", row.names = FALSE)
+immigration_total <- read.csv("OHSS Immigration Data.csv")
 ```
 
 ## Reading in the Datasets
 ```{r Datasets}
-#write.csv(immigration_total, "OHSS Immigration Data TIDY.csv", row.names = FALSE)
-
-immigration_total <- read.csv("OHSS Immigration Data TIDY.csv")
-
+immigration_total <- read.csv("OHSS Immigration Data.csv")
 gdp_total <- read.csv (skip = 4, 
                        check.names = FALSE, "Global_GDPs.csv")
 unempl_total <- read.csv (skip = 4, 
@@ -205,10 +169,11 @@ unempl_total <- unempl_total|>
   mutate(Year = as.numeric(Year))
 
 immigration_numbers <- immigration_total|>
-  filter(Sex == "Total"
+  filter(Characteristic == "Total",
+         Sex == "Total"
          )|>
-  select(Total, Country, Year)|>
-  rename(Immigrants = Total)
+  select(Country, Year, Value)|>
+  rename(Immigrants = Value)
 
 combined_total <- unempl_total|>
   left_join(gdp_total, by = c("Country","Year")
@@ -322,11 +287,11 @@ test_rf_df <- test_rf_df |>
   mutate(pred_rf = predict(rf_model, newdata = test_rf_df))
 
 rmse_rf <- rmse(test_rf_df$log_immigrants,test_rf_df$pred_rf)
-#0.431 with test_lm_2_df in test_rf_df
+#0.4288735 with test_lm_2_df in test_rf_df
 ```
 
 # Evaluation
-The Lagged Outcome Regression model with GDP achieves an RMSE of 0.2835, significantly better than the Random Forest model with an RMSE of `r round(rmse_rf, digits = 4)`. The model achieves a 3.3% lower RMSE than the LOCF baseline and a 51% lower RMSE than the linear trend model.
+The Lagged Outcome Regression model with GDP achieves an RMSE of 0.2835, significantly better than the Random Forest model with an RMSE of 0.421. The model achieves a 3.3% lower RMSE than the LOCF baseline and a 51% lower RMSE than the linear trend model.
 
 LOCF performed very well because immigration flows are very persistent over time. 
 Linear time trends assume smooth change over time and global events, such as Covid, greatly impacted it. It overfit a trend in the training that did not continue.
