@@ -22,13 +22,16 @@ library(tidyverse)
 library(randomForest)
 library(gt)
 library(readxl)
+# library(car)
+# library(leaps)
 ```
 # Datasets
 Immigration data was scraped from Office of Homeland of Security Statistics website, using Python and Playwright and then compiled into a data set using R.
 GDP and Unemployment Rates were avaible online.
 
 ## Python Data Scrape uses Playwright
-```{py Scraping Data}
+
+```text, eval=FALSE
 from playwright.sync_api import sync_playwright
 import os
 
@@ -82,8 +85,8 @@ with sync_playwright() as p:
 ```
 
 ## Data Cleaning using R
-```{Dont Run r Making Immigration Dataset}
-files <- list.files("C:/Users/death/OneDrive/Documents/Forecasting Immigration Project/OHSS_Immigration_Data", pattern = "\\.xls", full.names = TRUE)
+```Dont Run r Making Immigration Dataset
+files <- list.files("C:/Users/____/OneDrive/Documents/Forecasting Immigration Project/OHSS_Immigration_Data", pattern = "\\.xls", full.names = TRUE)
 
 length(files) 
   
@@ -189,7 +192,6 @@ combined_total <- combined_total |>
 combined_total <- combined_total |>
   filter(Immigrants > 0)|>
   mutate(log_immigrants = log(Immigrants))  
-
 ```
 
 # Models
@@ -230,6 +232,41 @@ rmse <- function(y, yhat) sqrt(mean((y - yhat)^2))
 rmse_trend <- rmse(test_base_lm_df$log_immigrants,test_base_lm_df$pred_trend)
 ```
 
+# Validation of Linear Model
+```{r, fig.cap="BP versus Sex", fig.pos='H'}
+#summary(trend_model)
+plot(trend_model)
+anova(trend_model)
+
+# trend_exhaust <- regsubsets(log_immigrants ~. - Immigrants, 
+#                             data = train_df, method = "forward", nvmax = 1000)
+# 
+# summary(trend_exhaust)
+# bic_fwd <- summary(trend_exhaust)$bic
+# plot(1:156, bic_fwd)
+# which(bic_fwd == min(bic_fwd))
+# 
+# best_subset <- summary(trend_exhaust)$which[134, ]
+# best_vars <- names(best_subset)[best_subset == TRUE]
+# best_vars <- best_vars[best_vars != "(Intercept)"]
+# 
+# cleaned_vars <- ifelse(grepl("^Country", best_vars), "Country", best_vars)
+# 
+# final_vars <- unique(cleaned_vars)
+# 
+# safe_vars <- paste0("`", final_vars, "`")
+# 
+# formula_str <- paste("log_immigrants ~", paste(safe_vars, collapse = " + "))
+# final_model <- lm(as.formula(formula_str), data = train_df)
+# 
+# anova(final_model, trend_model)
+# AIC(final_model, trend_model)
+```
+The anova looks great, we can, with high assurance, be assured that the variables do well in predicting the parameter. 
+
+The plots look well. we have linearity in the model and normally distributed residuals without any rouges.
+
+
 ## Lagged Outcome Regression Models
 Immigration levels tend to be persistent over time, hence using previous year's value and economic indicators, we predict the future. One model uses GDP and the Unemployment Rate, while a simpler model include GDP only. 
 Additional predictors such as country indicators were explored but they did not improve performance and in some cases worsened RMSE, so they were not retained.
@@ -264,9 +301,38 @@ rmse_lm_1 <- rmse(test_lm_df$log_immigrants,test_lm_df$pred_lm)
 rmse_lm_2 <- rmse(test_lm_2_df$log_immigrants,test_lm_2_df$pred_lm)
 ```
 
+# Validation of Lagged Linear Models
+```{r, fig.cap="BP versus Sex", fig.pos='H'}
+summary(lm_model)
+anova(lm_model)
+plot(lm_model)
+
+summary(lm_model_2)
+anova(lm_model_2)
+plot(lm_model_2)
+
+complete_df <- train_lm_df |>
+  filter(!is.na(log_immigrants), 
+         !is.na(GDP), 
+         !is.na(Unemployment_Rate), 
+         !is.na(Country), 
+         !is.na(Year))
+
+com_lm_model <- lm(log_immigrants ~ lag_immigrants + GDP + Unemployment_Rate, 
+               data = complete_df)
+
+com_lm_model_2 <- lm(log_immigrants ~ lag_immigrants + GDP, 
+               data = complete_df)
+
+anova(com_lm_model, com_lm_model_2)
+```
+The plots look well. we have linearity in the model and normally distributed residuals without any rouges that have large leverage on the model.
+
+We do fail to reject the NULL, thus, we don't have enough evidence to be 95% confident that the unemployment variable plays a role in predicting the log_immigrants parameter. 
+
 ## Random Forest
 A Random Forest model is included as a machine learning approach. Unlike AR and linear models, it does not assume linear relationships or explicit temporal structure, instead learning predictive patterns directly from the data.
-```{r}
+```{r, }
 features <- c(
   "lag_immigrants",
   "GDP",
@@ -302,7 +368,7 @@ Only a few economic indicators were included. Amongst which, unemployment rates 
 
 Illegal Alien population forecasts can be less impacted by policies and thus more accurate, but accurate data is not available on their populations.
 
-```{r Evaluation}
+```{r Evaluation, fig.cap="BP versus Sex", fig.pos='H'}
 #Table
 rmse_table <- data.frame(
   Model = c("LOCF", "Linear Trend", "Lagged Outcome (GDP+Unemployment)", "Lagged Outcome (GDP only)", "Random Forest"),
@@ -359,10 +425,9 @@ rmse_graph("India")
 rmse_graph("Mexico")
 rmse_graph("Philippines")
 rmse_graph("Dominican Republic")
-
 ```
 
 # Conclusion
 
-Overall, lagged outcome regression performed best, highlighting the string persistence in immigration flows over time. Although the Random Forest model was a flexible machine learning approach, it did not outperform the simpler lagged regression. This suggests that past immigration levels are highly informative for short-term forecasting and incorporating additional economic variables could further improve predictions.
+Overall, lagged outcome regression performed best, highlighting the strong persistence in immigration flows over time. Although the Random Forest model was a flexible machine learning approach, it did not outperform the simpler lagged regression. This suggests that past immigration levels are highly informative for short-term forecasting and incorporating additional economic variables could further improve predictions.
 
